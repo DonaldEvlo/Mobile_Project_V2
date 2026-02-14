@@ -1,0 +1,63 @@
+services:
+  # ── FastAPI Backend ──
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/security_db
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production-min-32-chars}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - SIEM_WEBHOOK_URL=${SIEM_WEBHOOK_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ml_models:/app/app/ml/models
+    restart: unless-stopped
+
+  # ── PostgreSQL 16 ──
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: security_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redis 7 ──
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Ollama runs natively on host (localhost:11434)
+
+volumes:
+  pgdata:
+  redisdata:
+  ml_models:
