@@ -18,8 +18,8 @@ class Settings(BaseSettings):
 
     # ── Ollama LLM ──
     OLLAMA_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "mistral:7b"
-    OLLAMA_TIMEOUT: int = 30
+    OLLAMA_MODEL: str = "qwen2.5:1.5b"
+    OLLAMA_TIMEOUT: int = 180
 
     # ── Webhooks ──
     SLACK_WEBHOOK_URL: str = ""

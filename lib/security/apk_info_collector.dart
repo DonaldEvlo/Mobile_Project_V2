@@ -35,6 +35,23 @@ class ApkInfoCollector {
     }
   }
 
+  /// Collect info for an external APK file by path.
+  Future<ApkInfo> getExternalApkInfo(String path) async {
+    try {
+      final result = await _channel.invokeMethod<Map>(
+        'getApkFileDetails',
+        {'path': path},
+      );
+      if (result == null) {
+        return ApkInfo.empty();
+      }
+      return ApkInfo.fromJson(Map<String, dynamic>.from(result));
+    } on PlatformException catch (e) {
+      _log.e('Failed to scan external APK: ${e.message}');
+      return ApkInfo.empty();
+    }
+  }
+
   /// Clear cached info to force re-collection.
   void clearCache() {
     _cachedInfo = null;
@@ -53,6 +70,10 @@ class ApkInfo {
   final int permissionsCount;
   final List<String> sensitivePermissions;
   final int sensitivePermissionsCount;
+  final List<String> activities;
+  final List<String> services;
+  final List<String> receivers;
+  final List<String> providers;
   final String installer;
   final bool isDebuggable;
   final int firstInstallTime;
@@ -70,6 +91,10 @@ class ApkInfo {
     this.permissionsCount = 0,
     this.sensitivePermissions = const [],
     this.sensitivePermissionsCount = 0,
+    this.activities = const [],
+    this.services = const [],
+    this.receivers = const [],
+    this.providers = const [],
     this.installer = 'unknown',
     this.isDebuggable = false,
     this.firstInstallTime = 0,
@@ -97,6 +122,15 @@ class ApkInfo {
           [],
       sensitivePermissionsCount:
           (json['sensitive_permissions_count'] as num?)?.toInt() ?? 0,
+      activities:
+          (json['activities'] as List?)?.map((e) => e.toString()).toList() ??
+              [],
+      services:
+          (json['services'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      receivers:
+          (json['receivers'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      providers:
+          (json['providers'] as List?)?.map((e) => e.toString()).toList() ?? [],
       installer: json['installer'] as String? ?? 'unknown',
       isDebuggable: json['is_debuggable'] as bool? ?? false,
       firstInstallTime: (json['first_install_time'] as num?)?.toInt() ?? 0,
@@ -107,7 +141,9 @@ class ApkInfo {
 
   /// Whether this APK was sideloaded (not from Play Store).
   bool get isSideloaded =>
-      installer == 'unknown (sideloaded)' || installer == 'unknown';
+      installer == 'unknown (sideloaded)' ||
+      installer == 'unknown' ||
+      installer == 'external_file';
 
   /// Human-readable APK size.
   String get formattedSize {

@@ -9,7 +9,8 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/security_db
       - REDIS_URL=redis://redis:6379
-      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:1.5b
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production-min-32-chars}
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
       - SIEM_WEBHOOK_URL=${SIEM_WEBHOOK_URL:-}
@@ -18,10 +19,50 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
     volumes:
       - ./backend:/app
       - ml_models:/app/app/ml/models
     restart: unless-stopped
+
+  # ── Ollama (Qwen) ──
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          memory: 4G
+
+  # ── Auto-pull Qwen model ──
+  ollama-pull:
+    image: curlimages/curl:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        echo '[SETUP] Checking if qwen2.5:1.5b model exists...' &&
+        if curl -s http://ollama:11434/api/tags | grep -q qwen2.5:1.5b; then
+          echo '[SETUP] qwen2.5:1.5b already downloaded, skipping.';
+        else
+          echo '[SETUP] Pulling qwen2.5:1.5b model (~1 GB)...' &&
+          curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"qwen2.5:1.5b\"}' &&
+          echo '[SETUP] qwen2.5:1.5b model ready!';
+        fi
+      "
+    restart: "no"
 
   # ── PostgreSQL 16 ──
   db:
@@ -55,9 +96,8 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Ollama runs natively on host (localhost:11434)
-
 volumes:
   pgdata:
   redisdata:
   ml_models:
+  ollama_data:

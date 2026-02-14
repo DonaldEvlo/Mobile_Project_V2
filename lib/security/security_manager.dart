@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:logger/logger.dart';
 
+import 'apk_info_collector.dart';
 import 'models/behavior_event.dart';
 import 'models/security_report.dart';
 import 'models/threat_level.dart';
@@ -22,6 +23,7 @@ class SecurityManager {
 
   // ── Dependencies ──
   final NativeSecurityBridge _nativeBridge = NativeSecurityBridge();
+  final ApkInfoCollector _apkCollector = ApkInfoCollector();
   final TFLiteAnalyzer _tfliteAnalyzer = TFLiteAnalyzer();
   final SecurityService _securityService = SecurityService();
   final _log = Logger(printer: PrettyPrinter(methodCount: 0));
@@ -30,10 +32,12 @@ class SecurityManager {
   final List<BehaviorEvent> _eventBuffer = [];
   static const int _maxBufferSize = 50;
   Timer? _periodicCheckTimer;
+  Timer? _simulationTimer;
   bool _isInitialized = false;
 
   ThreatLevel _currentThreatLevel = ThreatLevel.clean;
   SecurityChecks? _lastSecurityChecks;
+  ApkAudit? _lastApkAudit;
   double _lastAnomalyScore = 0.0;
 
   // ── Callbacks ──
@@ -43,6 +47,7 @@ class SecurityManager {
   // ── Accessors ──
   ThreatLevel get currentThreatLevel => _currentThreatLevel;
   SecurityChecks? get lastSecurityChecks => _lastSecurityChecks;
+  ApkAudit? get lastApkAudit => _lastApkAudit;
   double get lastAnomalyScore => _lastAnomalyScore;
   bool get isInitialized => _isInitialized;
   int get eventBufferSize => _eventBuffer.length;
@@ -64,12 +69,6 @@ class SecurityManager {
     // 3. Run initial security checks immediately
     await runFullSecurityScan();
 
-    // 4. Start periodic checks (every 30 seconds)
-    _periodicCheckTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => _periodicCheck(),
-    );
-
     _isInitialized = true;
     _log.i(
       'SecurityManager initialized — threat level: ${_currentThreatLevel.label}',
@@ -89,16 +88,21 @@ class SecurityManager {
     final checks = await _nativeBridge.runAllChecks();
     _lastSecurityChecks = checks;
 
-    // Step 2: TFLite behavioral analysis
+    // Step 2: APK Integrity Analysis
+    final apkInfo = await _apkCollector.collectApkInfo();
+    final apkAudit = _analyzeApk(apkInfo);
+    _lastApkAudit = apkAudit;
+
+    // Step 3: TFLite behavioral analysis
     final features = _tfliteAnalyzer.extractFeatures(_eventBuffer);
     _lastAnomalyScore = await _tfliteAnalyzer.analyzeBuffer(_eventBuffer);
 
-    // Step 3: Determine local threat level
-    final staticScore = _calculateStaticScore(checks);
+    // Step 4: Determine local threat level
+    final staticScore = _calculateStaticScore(checks, apkAudit);
     final combinedScore = (staticScore * 0.6) + (_lastAnomalyScore * 0.4);
     final threatLevel = ThreatLevel.fromScore(combinedScore);
 
-    // Step 4: Update state and notify
+    // Step 5: Update state and notify
     if (threatLevel != _currentThreatLevel) {
       _currentThreatLevel = threatLevel;
       onThreatLevelChanged?.call(threatLevel);
@@ -107,11 +111,15 @@ class SecurityManager {
       );
     }
 
-    // Step 5: Report to backend
+    // Update anomaly score immediately for UI
+    onThreatLevelChanged?.call(threatLevel);
+
+    // Step 6: Report to backend
     try {
       final report = SecurityReport(
         deviceId: await _securityService.getDeviceId(),
         securityChecks: checks,
+        apkAudit: apkAudit,
         behaviorFeatures: features,
         localAnomalyScore: _lastAnomalyScore,
         localThreatLevel: threatLevel,
@@ -128,6 +136,43 @@ class SecurityManager {
     }
 
     return threatLevel;
+  }
+
+  /// Delegate external APK analysis to the securty service.
+  Future<SecurityReportResponse?> sendExternalApkAnalysis(
+      ApkAudit audit) async {
+    return _securityService.sendExternalApkAnalysis(audit);
+  }
+
+  /// Send the currently installed (self) APK for cloud AI analysis.
+  Future<SecurityReportResponse?> sendSelfApkAnalysis() async {
+    if (_lastApkAudit == null) return null;
+    return _securityService.sendExternalApkAnalysis(_lastApkAudit!);
+  }
+
+  /// Check if Ollama/Qwen is reachable.
+  Future<Map<String, dynamic>> checkOllamaStatus() async {
+    return _securityService.checkOllamaStatus();
+  }
+
+  /// Analyze raw APK info and generate a structured audit.
+  ApkAudit _analyzeApk(ApkInfo info) {
+    return ApkAudit(
+      packageName: info.packageName,
+      version: '${info.versionName} (${info.versionCode})',
+      apkHash: info.apkHash,
+      installerSource: info.installer,
+      isSideloaded: info.isSideloaded,
+      isDebuggable: info.isDebuggable,
+      sensitivePermissionsCount: info.sensitivePermissionsCount,
+      permissions: info.permissions,
+      sensitivePermissions: info.sensitivePermissions,
+      activities: info.activities,
+      services: info.services,
+      receivers: info.receivers,
+      providers: info.providers,
+      isValid: info.isValid,
+    );
   }
 
   /// Record a behavioral event for the TFLite anomaly detector.
@@ -189,12 +234,24 @@ class SecurityManager {
 
   /// Calculate static threat score from native security checks.
   ///
-  /// Uses the calibrated weights from the spec:
-  /// Frida=0.95, Hooks=0.90, CertPin=0.85, Signature=0.80,
-  /// DEX=0.80, Xposed=0.70, Debugger=0.60, Root=0.40, Emulator=0.20
-  double _calculateStaticScore(SecurityChecks checks) {
+  /// Uses calibrated weights for native checks + APK attributes.
+  double _calculateStaticScore(SecurityChecks checks, ApkAudit audit) {
     double maxScore = 0.0;
 
+    // --- APK Integrity ---
+    if (!audit.isValid) {
+      maxScore = 0.85; // Failed to parse APK info
+    }
+    if (audit.isSideloaded) {
+      // Sideloading is common but risky
+      maxScore = maxScore > 0.45 ? maxScore : 0.45;
+    }
+    if (audit.isDebuggable) {
+      // Debuggable logic in prod is VERY dangerous
+      maxScore = maxScore > 0.90 ? maxScore : 0.90;
+    }
+
+    // --- Native Checks ---
     if (checks.fridaDetected) {
       maxScore = maxScore > 0.95 ? maxScore : 0.95;
     }
@@ -226,22 +283,10 @@ class SecurityManager {
     return maxScore;
   }
 
-  /// Periodic background check — less aggressive than full scan.
-  Future<void> _periodicCheck() async {
-    if (_eventBuffer.isNotEmpty) {
-      final score = await _tfliteAnalyzer.analyzeBuffer(_eventBuffer);
-      if (score > 0.40) {
-        _log.w(
-          'Periodic check: elevated anomaly score ($score) — running full scan',
-        );
-        await runFullSecurityScan();
-      }
-    }
-  }
-
   /// Clean up resources.
   void dispose() {
     _periodicCheckTimer?.cancel();
+    _simulationTimer?.cancel();
     _tfliteAnalyzer.dispose();
     _eventBuffer.clear();
     _isInitialized = false;

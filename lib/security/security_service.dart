@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -62,9 +63,10 @@ class SecurityService {
   ///
   /// Returns [SecurityReportResponse] on success, null on failure.
   /// The system continues in offline mode if the backend is unreachable.
-  Future<SecurityReportResponse?> sendReport(SecurityReport report) async {
+  Future<SecurityReportResponse?> sendReport(SecurityReport report,
+      {bool waitForLlm = false}) async {
     final response = await _httpClient.post(
-      '/api/security/report',
+      '/api/security/report${waitForLlm ? '?wait_for_llm=true' : ''}',
       report.toJson(),
     );
 
@@ -81,6 +83,45 @@ class SecurityService {
     }
 
     return parsed;
+  }
+
+  /// Send an external APK audit to the backend for analysis.
+  Future<SecurityReportResponse?> sendExternalApkAnalysis(
+      ApkAudit audit) async {
+    final response = await _httpClient.post(
+      '/api/security/apk-analysis',
+      audit.toJson(),
+    );
+
+    if (response == null) {
+      _log.w('Cloud analysis failed — backend unreachable');
+      return null;
+    }
+
+    return SecurityReportResponse.fromJson(response);
+  }
+
+  /// Check if Ollama/Qwen is reachable and return model info.
+  ///
+  /// Returns a map with 'reachable' (bool) and 'model' (String?) keys.
+  Future<Map<String, dynamic>> checkOllamaStatus() async {
+    try {
+      final response = await _httpClient.get('/api/security/health');
+      if (response != null) {
+        return {
+          'reachable': true,
+          'model': response['llm_model'] ?? 'qwen2.5:1.5b',
+          'status': response['llm_status'] ?? 'unknown',
+        };
+      }
+    } catch (e) {
+      _log.w('Ollama status check failed: $e');
+    }
+    return {
+      'reachable': false,
+      'model': null,
+      'status': 'unreachable',
+    };
   }
 
   /// Authenticate with the backend to obtain a JWT token.
@@ -106,6 +147,31 @@ class SecurityService {
   Future<void> setBackendUrl(String url) async {
     _httpClient.setBaseUrl(url);
     await _secureStorage.write(key: 'backend_url', value: url);
+  }
+
+  /// Explain risk for a single APK item (permission, activity, service, etc.)
+  ///
+  /// Returns a map with 'explanation', 'risk_level', 'recommendation'.
+  Future<Map<String, dynamic>?> explainRisk({
+    required String itemType,
+    required String itemName,
+    required Map<String, dynamic> context,
+  }) async {
+    final response = await _httpClient.post(
+      '/api/security/explain-risk',
+      {
+        'item_type': itemType,
+        'item_name': itemName,
+        'context': context,
+      },
+    );
+
+    if (response == null) {
+      _log.w('Explain risk failed — backend unreachable');
+      return null;
+    }
+
+    return response;
   }
 
   /// Revoke all local credentials on force logout.

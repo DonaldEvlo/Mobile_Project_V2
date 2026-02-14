@@ -41,16 +41,16 @@ class SecurityChecks {
       certPinningBypassed;
 
   Map<String, dynamic> toJson() => {
-    'frida_detected': fridaDetected,
-    'root_detected': rootDetected,
-    'signature_valid': signatureValid,
-    'dex_integrity_valid': dexIntegrityValid,
-    'xposed_detected': xposedDetected,
-    'debugger_attached': debuggerAttached,
-    'emulator_detected': emulatorDetected,
-    'hook_detected': hookDetected,
-    'cert_pinning_bypassed': certPinningBypassed,
-  };
+        'frida_detected': fridaDetected,
+        'root_detected': rootDetected,
+        'signature_valid': signatureValid,
+        'dex_integrity_valid': dexIntegrityValid,
+        'xposed_detected': xposedDetected,
+        'debugger_attached': debuggerAttached,
+        'emulator_detected': emulatorDetected,
+        'hook_detected': hookDetected,
+        'cert_pinning_bypassed': certPinningBypassed,
+      };
 
   factory SecurityChecks.fromJson(Map<String, dynamic> json) {
     return SecurityChecks(
@@ -87,22 +87,22 @@ class BehaviorFeatures {
 
   /// Convert to a flat list for TFLite model input.
   List<double> toFeatureVector() => [
-    networkCallsCount,
-    fileAccessCount,
-    timingEntropy,
-    apiCallSequenceHash,
-    memoryAnomalyScore,
-    cpuSpikeCount,
-  ];
+        networkCallsCount,
+        fileAccessCount,
+        timingEntropy,
+        apiCallSequenceHash,
+        memoryAnomalyScore,
+        cpuSpikeCount,
+      ];
 
   Map<String, dynamic> toJson() => {
-    'network_calls_count': networkCallsCount,
-    'file_access_count': fileAccessCount,
-    'timing_entropy': timingEntropy,
-    'api_call_sequence_hash': apiCallSequenceHash,
-    'memory_anomaly_score': memoryAnomalyScore,
-    'cpu_spike_count': cpuSpikeCount,
-  };
+        'network_calls_count': networkCallsCount,
+        'file_access_count': fileAccessCount,
+        'timing_entropy': timingEntropy,
+        'api_call_sequence_hash': apiCallSequenceHash,
+        'memory_anomaly_score': memoryAnomalyScore,
+        'cpu_spike_count': cpuSpikeCount,
+      };
 
   factory BehaviorFeatures.fromJson(Map<String, dynamic> json) {
     return BehaviorFeatures(
@@ -123,6 +123,7 @@ class SecurityReport {
   final String? platform;
   final String? osVersion;
   final SecurityChecks securityChecks;
+  final ApkAudit? apkAudit;
   final BehaviorFeatures behaviorFeatures;
   final double? localAnomalyScore;
   final ThreatLevel? localThreatLevel;
@@ -134,6 +135,7 @@ class SecurityReport {
     this.platform,
     this.osVersion,
     required this.securityChecks,
+    this.apkAudit,
     required this.behaviorFeatures,
     this.localAnomalyScore,
     this.localThreatLevel,
@@ -141,16 +143,69 @@ class SecurityReport {
   }) : timestamp = timestamp ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
-    'device_id': deviceId,
-    'app_version': appVersion,
-    'platform': platform,
-    'os_version': osVersion,
-    'security_checks': securityChecks.toJson(),
-    'behavior_features': behaviorFeatures.toJson(),
-    'local_anomaly_score': localAnomalyScore,
-    'local_threat_level': localThreatLevel?.name,
-    'timestamp': timestamp.toIso8601String(),
-  };
+        'device_id': deviceId,
+        'app_version': appVersion,
+        'platform': platform,
+        'os_version': osVersion,
+        'security_checks': securityChecks.toJson(),
+        'apk_audit': apkAudit?.toJson(),
+        'behavior_features': behaviorFeatures.toJson(),
+        'local_anomaly_score': localAnomalyScore,
+        'local_threat_level': localThreatLevel?.name,
+        'timestamp': timestamp.toIso8601String(),
+      };
+}
+
+/// Audit result for the APK integrity.
+class ApkAudit {
+  final String packageName;
+  final String version;
+  final String apkHash;
+  final String installerSource;
+  final bool isSideloaded;
+  final bool isDebuggable;
+  final int sensitivePermissionsCount;
+  final List<String> permissions;
+  final List<String> sensitivePermissions;
+  final List<String> activities;
+  final List<String> services;
+  final List<String> receivers;
+  final List<String> providers;
+  final bool isValid;
+
+  const ApkAudit({
+    required this.packageName,
+    required this.version,
+    required this.apkHash,
+    required this.installerSource,
+    required this.isSideloaded,
+    required this.isDebuggable,
+    required this.sensitivePermissionsCount,
+    this.permissions = const [],
+    this.sensitivePermissions = const [],
+    this.activities = const [],
+    this.services = const [],
+    this.receivers = const [],
+    this.providers = const [],
+    required this.isValid,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'package_name': packageName,
+        'version': version,
+        'apk_hash': apkHash,
+        'installer_source': installerSource,
+        'is_sideloaded': isSideloaded,
+        'is_debuggable': isDebuggable,
+        'sensitive_permissions_count': sensitivePermissionsCount,
+        'sensitive_permissions': sensitivePermissions,
+        'permissions': permissions,
+        'activities': activities,
+        'services': services,
+        'receivers': receivers,
+        'providers': providers,
+        'is_valid': isValid,
+      };
 }
 
 /// Response from the backend after processing a security report.
@@ -159,12 +214,14 @@ class SecurityReportResponse {
   final double score;
   final String? action;
   final String? message;
+  final String? llmAnalysis;
 
   const SecurityReportResponse({
     required this.threatLevel,
     required this.score,
     this.action,
     this.message,
+    this.llmAnalysis,
   });
 
   /// Whether the backend ordered a force logout.
@@ -176,6 +233,7 @@ class SecurityReportResponse {
       score: (json['score'] ?? 0).toDouble(),
       action: json['action'],
       message: json['message'],
+      llmAnalysis: json['llm_analysis'],
     );
   }
 }

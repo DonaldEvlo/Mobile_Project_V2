@@ -6,9 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../app_theme.dart';
+import '../main.dart';
+import '../security/external_apk_scanner.dart';
+import '../security/models/security_report.dart';
 import '../security/models/threat_level.dart';
 import '../security/security_manager.dart';
 import 'apk_analysis_screen.dart';
+import 'apk_report_screen.dart';
 
 /// Real-time security dashboard showing current threat status,
 /// detection vectors, recent events, and anomaly score.
@@ -22,6 +26,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   final SecurityManager _securityManager = SecurityManager();
+  final ExternalApkScanner _externalScanner = ExternalApkScanner();
 
   late AnimationController _pulseController;
   late AnimationController _scanController;
@@ -53,32 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       duration: const Duration(seconds: 3),
     )..repeat();
 
-    // Refresh UI frequently for responsiveness
-    _uiRefreshTimer = Timer.periodic(
-      const Duration(milliseconds: 800),
-      (_) {
-        if (mounted) setState(() {});
-      },
-    );
-
-    // Simulate graph verification updates (heartbeat)
-    _graphDataTimer = Timer.periodic(
-      const Duration(milliseconds: 200),
-      (_) {
-        if (mounted) {
-          setState(() {
-            double currentScore = _securityManager.lastAnomalyScore;
-            // Add tiny noise to make graph feel alive even when idle
-            if (currentScore < 0.05) {
-              currentScore = (Random().nextDouble() * 0.03);
-            }
-            _scoreHistory.removeAt(0);
-            _scoreHistory.add(currentScore);
-          });
-        }
-      },
-    );
-
+    // UI updates are now driven by state changes or manual interaction
     _securityManager.onThreatLevelChanged = (level) {
       if (mounted) setState(() {});
     };
@@ -95,12 +75,65 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _runManualScan() async {
+    if (!mounted) return;
     setState(() => _isScanning = true);
     _scanController.repeat();
+
+    // Force full scan
     await _securityManager.runFullSecurityScan();
-    _scanController.stop();
-    _scanController.reset();
-    setState(() => _isScanning = false);
+
+    if (mounted) {
+      _scanController.stop();
+      _scanController.reset();
+      setState(() {
+        _isScanning = false;
+        // Update graph with new score manually
+        _scoreHistory.removeAt(0);
+        _scoreHistory.add(_securityManager.lastAnomalyScore);
+      });
+    }
+  }
+
+  Future<void> _scanExternalApk() async {
+    // 1. Pick APK file (local analysis only)
+    final audit = await _externalScanner.pickAndAnalyzeApk();
+    if (audit == null || !mounted) return; // User canceled
+
+    // 2. Show the Qwen analysis popup dialog
+    SecurityReportResponse? cloudResponse;
+    bool analysisCancelled = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return _QwenAnalysisDialog(
+          securityManager: _securityManager,
+          audit: audit,
+          onAnalysisComplete: (response) {
+            cloudResponse = response;
+            Navigator.of(dialogContext).pop();
+          },
+          onCancel: () {
+            analysisCancelled = true;
+            Navigator.of(dialogContext).pop();
+          },
+        );
+      },
+    );
+
+    if (analysisCancelled || !mounted) return;
+
+    // 3. Navigate to report (only when analysis is complete)
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ApkReportScreen(
+          audit: audit,
+          cloudResponse: cloudResponse,
+        ),
+      ),
+    );
   }
 
   @override
@@ -110,7 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final score = _securityManager.lastAnomalyScore;
 
     return Scaffold(
-      backgroundColor: AppTheme.bgDark,
+      backgroundColor: AppTheme.backgroundColor(context),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
@@ -118,42 +151,48 @@ class _DashboardScreenState extends State<DashboardScreen>
           SliverAppBar(
             expandedHeight: 80,
             floating: true,
-            backgroundColor: AppTheme.bgDark,
+            backgroundColor: AppTheme.backgroundColor(context),
+            titleSpacing: 0,
             title: Row(
               children: [
+                const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
                     Icons.shield_outlined,
                     color: Colors.white,
-                    size: 24,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Security Monitor',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 20,
-                        color: AppTheme.textPrimary,
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Security Monitor',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: AppTheme.primaryText(context),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    Text(
-                      'Live Protection Active',
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        color: AppTheme.accentGreen,
-                        fontWeight: FontWeight.w600,
+                      Text(
+                        'Live Protection Active',
+                        style: GoogleFonts.inter(
+                          fontSize: 9,
+                          color: AppTheme.accentGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -161,7 +200,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               // APK analysis button
               IconButton(
                 icon: const Icon(Icons.find_in_page,
-                    color: AppTheme.textSecondary),
+                    color: AppTheme.textSecondary, size: 20),
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -169,6 +208,29 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                 ),
                 tooltip: 'APK Analysis',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36),
+              ),
+              // External APK Scan
+              IconButton(
+                icon: const Icon(Icons.upload_file,
+                    color: AppTheme.accentAmber, size: 20),
+                onPressed: _scanExternalApk,
+                tooltip: 'Scan External APK',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36),
+              ),
+              // Theme toggle
+              IconButton(
+                icon: Icon(
+                  AppTheme.isDark(context) ? Icons.light_mode : Icons.dark_mode,
+                  color: AppTheme.secondaryText(context),
+                  size: 20,
+                ),
+                onPressed: () => AntiTamperingApp.of(context).toggleTheme(),
+                tooltip: 'Toggle Theme',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36),
               ),
               // Manual scan button
               RotationTransition(
@@ -179,12 +241,15 @@ class _DashboardScreenState extends State<DashboardScreen>
                     color: _isScanning
                         ? AppTheme.accentCyan
                         : AppTheme.textSecondary,
+                    size: 20,
                   ),
                   onPressed: _isScanning ? null : _runManualScan,
                   tooltip: 'Run Security Scan',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
             ],
           ),
 
@@ -646,6 +711,374 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
     );
+  }
+}
+
+/// Dialog that handles APK cloud analysis with Qwen status feedback.
+///
+/// Three phases:
+/// 1. Checking Ollama/Qwen connectivity
+/// 2. Running LLM analysis (may take 30-60s)
+/// 3. Complete → auto-closes and navigates to report
+class _QwenAnalysisDialog extends StatefulWidget {
+  final SecurityManager securityManager;
+  final ApkAudit audit;
+  final void Function(SecurityReportResponse?) onAnalysisComplete;
+  final VoidCallback onCancel;
+
+  const _QwenAnalysisDialog({
+    required this.securityManager,
+    required this.audit,
+    required this.onAnalysisComplete,
+    required this.onCancel,
+  });
+
+  @override
+  State<_QwenAnalysisDialog> createState() => _QwenAnalysisDialogState();
+}
+
+class _QwenAnalysisDialogState extends State<_QwenAnalysisDialog>
+    with SingleTickerProviderStateMixin {
+  // Phases
+  String _phase = 'checking'; // checking, analyzing, complete, error
+  String _modelName = 'qwen2.5:1.5b';
+  String _statusMessage = 'Vérification de la connexion Ollama…';
+  bool _ollamaReachable = false;
+  late AnimationController _progressController;
+  int _elapsedSeconds = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+    _startAnalysis();
+  }
+
+  @override
+  void dispose() {
+    _progressController.dispose();
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startAnalysis() async {
+    // Phase 1: Check Ollama status
+    final status = await widget.securityManager.checkOllamaStatus();
+    if (!mounted) return;
+
+    setState(() {
+      _ollamaReachable = status['reachable'] as bool;
+      _modelName = (status['model'] as String?) ?? 'qwen2.5:1.5b';
+    });
+
+    if (!_ollamaReachable) {
+      setState(() {
+        _phase = 'error';
+        _statusMessage = 'Impossible de contacter le serveur Ollama.\n'
+            'Vérifiez que Ollama est démarré et accessible.';
+      });
+      return;
+    }
+
+    // Phase 2: Run LLM analysis
+    setState(() {
+      _phase = 'analyzing';
+      _statusMessage = 'Analyse IA par $_modelName en cours…\n'
+          'Cela peut prendre jusqu\'à 2 minutes.';
+    });
+
+    // Start elapsed time counter
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _elapsedSeconds++);
+    });
+
+    SecurityReportResponse? response;
+    try {
+      response =
+          await widget.securityManager.sendExternalApkAnalysis(widget.audit);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _phase = 'error';
+          _statusMessage = 'Erreur lors de l\'analyse : $e';
+        });
+      }
+      return;
+    }
+
+    _timer?.cancel();
+    if (!mounted) return;
+
+    if (response != null && response.llmAnalysis != null) {
+      setState(() {
+        _phase = 'complete';
+        _statusMessage = 'Analyse terminée avec succès !';
+      });
+      await Future.delayed(const Duration(milliseconds: 800));
+      widget.onAnalysisComplete(response);
+    } else if (response != null) {
+      // Got a response but no LLM analysis
+      setState(() {
+        _phase = 'complete';
+        _statusMessage = 'Analyse statique terminée.\n'
+            'Le rapport IA n\'a pas pu être généré.';
+      });
+      await Future.delayed(const Duration(seconds: 1));
+      widget.onAnalysisComplete(response);
+    } else {
+      setState(() {
+        _phase = 'error';
+        _statusMessage = 'Le serveur n\'a pas retourné de résultat.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppTheme.bgCard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.accentPurple.withOpacity(0.3),
+                        AppTheme.accentCyan.withOpacity(0.3),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.smart_toy_outlined,
+                    color: AppTheme.accentCyan,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Analyse IA Qwen',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        widget.audit.packageName,
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Status indicator
+            _buildStatusIndicator(),
+            const SizedBox(height: 16),
+
+            // Model info chip
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppTheme.accentPurple.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _ollamaReachable ? Icons.check_circle : Icons.error_outline,
+                    size: 14,
+                    color: _ollamaReachable
+                        ? AppTheme.accentGreen
+                        : AppTheme.accentRed,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Modèle : $_modelName',
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 11,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Status message
+            Text(
+              _statusMessage,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+                height: 1.4,
+              ),
+            ),
+
+            // Elapsed time (during analysis)
+            if (_phase == 'analyzing') ...[
+              const SizedBox(height: 8),
+              Text(
+                'Temps écoulé : ${_elapsedSeconds}s',
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12,
+                  color: AppTheme.accentAmber,
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            // Action buttons
+            if (_phase == 'error')
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: widget.onCancel,
+                    child: Text(
+                      'Fermer',
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _phase = 'checking';
+                        _statusMessage = 'Nouvelle tentative…';
+                        _elapsedSeconds = 0;
+                      });
+                      _startAnalysis();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.accentCyan,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Réessayer',
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              )
+            else if (_phase == 'analyzing')
+              TextButton(
+                onPressed: widget.onCancel,
+                child: Text(
+                  'Annuler',
+                  style: TextStyle(color: AppTheme.accentRed),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusIndicator() {
+    switch (_phase) {
+      case 'checking':
+        return AnimatedBuilder(
+          animation: _progressController,
+          builder: (context, child) {
+            return Column(
+              children: [
+                SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation(
+                      AppTheme.accentCyan.withOpacity(
+                        0.5 + _progressController.value * 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+
+      case 'analyzing':
+        return AnimatedBuilder(
+          animation: _progressController,
+          builder: (context, child) {
+            return Column(
+              children: [
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation(
+                          AppTheme.accentPurple.withOpacity(
+                            0.4 + _progressController.value * 0.6,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.psychology,
+                        color: AppTheme.accentPurple,
+                        size: 28,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+
+      case 'complete':
+        return const Icon(
+          Icons.check_circle,
+          color: AppTheme.accentGreen,
+          size: 56,
+        );
+
+      case 'error':
+        return const Icon(
+          Icons.error_outline,
+          color: AppTheme.accentRed,
+          size: 56,
+        );
+
+      default:
+        return const SizedBox.shrink();
+    }
   }
 }
 

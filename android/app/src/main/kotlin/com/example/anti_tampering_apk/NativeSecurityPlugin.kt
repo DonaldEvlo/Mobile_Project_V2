@@ -73,6 +73,20 @@ class NativeSecurityPlugin : FlutterPlugin, MethodCallHandler {
                 }
             }
 
+            "getApkFileDetails" -> {
+                val path = call.argument<String>("path")
+                if (path == null) {
+                    result.error("INVALID_ARG", "Missing 'path' argument", null)
+                    return
+                }
+                try {
+                    val info = getApkFileDetails(path)
+                    result.success(info)
+                } catch (e: Exception) {
+                    result.error("APK_FILE_ERROR", e.message, null)
+                }
+            }
+
             else -> result.notImplemented()
         }
     }
@@ -223,6 +237,105 @@ class NativeSecurityPlugin : FlutterPlugin, MethodCallHandler {
 
         } catch (e: Exception) {
             result["error"] = e.message ?: "Unknown error"
+        }
+
+        return result
+    }
+
+    /**
+     * Parse an external APK file to extract metadata for security analysis.
+     */
+    @Suppress("DEPRECATION")
+    private fun getApkFileDetails(path: String): Map<String, Any> {
+        val result = mutableMapOf<String, Any>()
+        val apkFile = File(path)
+
+        if (!apkFile.exists()) {
+            throw IllegalArgumentException("File not found: $path")
+        }
+
+        try {
+            val pm = appContext.packageManager
+            // Comprehensive extraction flags
+            val flags = PackageManager.GET_PERMISSIONS or
+                        PackageManager.GET_ACTIVITIES or
+                        PackageManager.GET_SERVICES or
+                        PackageManager.GET_RECEIVERS or
+                        PackageManager.GET_PROVIDERS
+
+            val pkgInfo = pm.getPackageArchiveInfo(path, flags)
+                ?: throw IllegalArgumentException("Invalid APK file")
+
+            // Need to set sourceDir for some older Android versions to read resources, but often not needed for manifest
+            // pkgInfo.applicationInfo.sourceDir = path
+            // pkgInfo.applicationInfo.publicSourceDir = path
+
+            val packageName = pkgInfo.packageName ?: "unknown"
+            result["package_name"] = packageName
+            result["version_name"] = pkgInfo.versionName ?: "unknown"
+            result["version_code"] = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pkgInfo.longVersionCode
+            } else {
+                pkgInfo.versionCode.toLong()
+            }
+
+            // APK Hash
+            val md = MessageDigest.getInstance("SHA-256")
+            apkFile.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    md.update(buffer, 0, bytesRead)
+                }
+            }
+            val digest = md.digest()
+            result["apk_hash"] = digest.joinToString("") { "%02x".format(it) }
+            result["apk_size"] = apkFile.length()
+
+            // Components
+            result["activities"] = pkgInfo.activities?.map { it.name } ?: emptyList<String>()
+            result["services"] = pkgInfo.services?.map { it.name } ?: emptyList<String>()
+            result["receivers"] = pkgInfo.receivers?.map { it.name } ?: emptyList<String>()
+            result["providers"] = pkgInfo.providers?.map { it.name } ?: emptyList<String>()
+
+            // Permissions
+            val permissions = pkgInfo.requestedPermissions?.toList() ?: emptyList()
+            result["permissions"] = permissions
+            result["permissions_count"] = permissions.size
+
+            // Sensitive permissions detection
+            val sensitivePerms = listOf(
+                "android.permission.CAMERA",
+                "android.permission.RECORD_AUDIO",
+                "android.permission.READ_CONTACTS",
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.READ_SMS",
+                "android.permission.SEND_SMS",
+                "android.permission.READ_CALL_LOG",
+                "android.permission.READ_PHONE_STATE",
+                "android.permission.WRITE_EXTERNAL_STORAGE",
+                "android.permission.READ_EXTERNAL_STORAGE",
+                "android.permission.SYSTEM_ALERT_WINDOW",
+                "android.permission.INSTALL_PACKAGES",
+                "android.permission.REQUEST_INSTALL_PACKAGES"
+            )
+            val foundSensitive = permissions.filter { it in sensitivePerms }
+            result["sensitive_permissions"] = foundSensitive
+            result["sensitive_permissions_count"] = foundSensitive.size
+
+            // Debuggable flag
+            val appInfo = pkgInfo.applicationInfo 
+            if (appInfo != null) {
+                 result["is_debuggable"] = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+            } else {
+                 result["is_debuggable"] = false
+            }
+            
+            // Cannot modify existing installed status, so fields like 'installer' are N/A for a file
+            result["installer"] = "external_file"
+
+        } catch (e: Exception) {
+            result["error"] = e.message ?: "Analysis failed"
         }
 
         return result

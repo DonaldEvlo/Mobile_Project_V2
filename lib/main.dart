@@ -1,30 +1,64 @@
 import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
-import 'security/security_gate.dart';
-import 'security/security_manager.dart';
+import 'screens/splash_screen.dart';
+import 'theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize the security system (TFLite + HTTP client)
-  // The SecurityGate handles the initial scan and startup blocking.
-  final securityManager = SecurityManager();
-  await securityManager.initialize();
+  // Initialize theme provider (lightweight, safe)
+  final themeProvider = ThemeProvider();
+  await themeProvider.initialize();
 
-  runApp(const AntiTamperingApp());
+  // Security initialization happens in SecurityGate, NOT here.
+  // Running it before runApp() caused crashes when backend was unreachable
+  // or native plugins were missing (emulator).
+
+  runApp(AntiTamperingApp(themeProvider: themeProvider));
 }
 
-class AntiTamperingApp extends StatelessWidget {
-  const AntiTamperingApp({super.key});
+class AntiTamperingApp extends StatefulWidget {
+  final ThemeProvider themeProvider;
+
+  const AntiTamperingApp({super.key, required this.themeProvider});
+
+  /// Global access to theme provider from anywhere.
+  static ThemeProvider of(BuildContext context) {
+    final state = context.findAncestorStateOfType<_AntiTamperingAppState>();
+    return state!.widget.themeProvider;
+  }
+
+  @override
+  State<AntiTamperingApp> createState() => _AntiTamperingAppState();
+}
+
+class _AntiTamperingAppState extends State<AntiTamperingApp> {
+  @override
+  void initState() {
+    super.initState();
+    widget.themeProvider.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.themeProvider.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Anti-Tampering APK',
+      title: 'GuardPay AI',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: const SecurityGate(),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: widget.themeProvider.themeMode,
+      home: const SplashScreen(),
     );
   }
 }

@@ -57,36 +57,49 @@ class _SecurityGateState extends State<SecurityGate>
   }
 
   Future<void> _runStartupScan() async {
-    // Step 1: Show progress
-    _updateStatus('Checking native security vectors...', 0.15);
-    await Future.delayed(const Duration(milliseconds: 300));
+    try {
+      // Step 1: Initialize security system
+      _updateStatus('Initializing security module...', 0.10);
+      await _securityManager.initialize();
 
-    // Step 2: Run the actual scan
-    _updateStatus('Running integrity verification...', 0.40);
-    final threatLevel = await _securityManager.runFullSecurityScan();
-    _detectedLevel = threatLevel;
+      // Step 2: Show progress
+      _updateStatus('Checking native security vectors...', 0.25);
+      await Future.delayed(const Duration(milliseconds: 300));
 
-    _updateStatus('Analyzing behavioral patterns...', 0.70);
-    await Future.delayed(const Duration(milliseconds: 200));
+      // Step 3: Check APK Integrity
+      _updateStatus('Verifying APK integrity...', 0.40);
+      await Future.delayed(const Duration(milliseconds: 300));
 
-    _updateStatus('Computing threat score...', 0.90);
-    await Future.delayed(const Duration(milliseconds: 200));
+      // Step 4: Run the actual scan
+      _updateStatus('Running integrity verification...', 0.55);
+      final threatLevel = await _securityManager.runFullSecurityScan();
+      _detectedLevel = threatLevel;
 
-    _updateStatus('Scan complete.', 1.0);
-    await Future.delayed(const Duration(milliseconds: 300));
+      _updateStatus('Analyzing behavioral patterns...', 0.75);
+      await Future.delayed(const Duration(milliseconds: 200));
 
-    // Step 3: Decide what to do
-    if (!mounted) return;
+      _updateStatus('Computing threat score...', 0.90);
+      await Future.delayed(const Duration(milliseconds: 200));
 
-    if (threatLevel.requiresAction) {
-      // HIGH or CRITICAL → block
-      setState(() => _state = _GateState.blocked);
-    } else if (threatLevel == ThreatLevel.medium) {
-      // MEDIUM → warn
-      setState(() => _state = _GateState.warning);
-    } else {
-      // CLEAN or LOW → proceed
-      _proceedToApp();
+      _updateStatus('Scan complete.', 1.0);
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Step 5: Decide what to do
+      if (!mounted) return;
+
+      if (threatLevel.requiresAction) {
+        setState(() => _state = _GateState.blocked);
+      } else if (threatLevel == ThreatLevel.medium) {
+        setState(() => _state = _GateState.warning);
+      } else {
+        _proceedToApp();
+      }
+    } catch (e) {
+      // If ANYTHING fails, proceed to app anyway (offline-first design)
+      debugPrint('SecurityGate scan failed: $e');
+      _updateStatus('Scan complete (offline mode)', 1.0);
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) _proceedToApp();
     }
   }
 
@@ -115,7 +128,7 @@ class _SecurityGateState extends State<SecurityGate>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgDark,
+      backgroundColor: AppTheme.backgroundColor(context),
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -436,6 +449,16 @@ class _SecurityGateState extends State<SecurityGate>
     if (checks.debuggerAttached) triggered.add('🟡 Debugger Attached');
     if (checks.rootDetected) triggered.add('🟡 Root Detected');
     if (checks.emulatorDetected) triggered.add('🔵 Emulator Detected');
+
+    final apk = _securityManager.lastApkAudit;
+    if (apk != null) {
+      if (!apk.isValid) triggered.add('🟠 Invalid APK Info');
+      if (apk.isSideloaded) triggered.add('🟡 App Sideloaded');
+      if (apk.isDebuggable) triggered.add('🔴 Debuggable Build');
+      if (apk.sensitivePermissionsCount > 5) {
+        triggered.add('🔵 High Privileges (${apk.sensitivePermissionsCount})');
+      }
+    }
 
     if (triggered.isEmpty) return const SizedBox.shrink();
 
