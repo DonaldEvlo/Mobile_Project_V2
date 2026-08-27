@@ -7,48 +7,36 @@ import 'package:google_fonts/google_fonts.dart';
 class AppTheme {
   AppTheme._();
 
-  // ═══════════════════════════════════════════════
-  // DARK PALETTE
-  // ═══════════════════════════════════════════════
+  // ── DARK PALETTE ──
   static const Color bgDark = Color(0xFF0A0E1A);
   static const Color bgCard = Color(0xFF121829);
   static const Color bgCardLight = Color(0xFF1A2240);
   static const Color surface = Color(0xFF1E2545);
 
-  // ═══════════════════════════════════════════════
-  // LIGHT PALETTE
-  // ═══════════════════════════════════════════════
+  // ── LIGHT PALETTE ──
   static const Color bgLight = Color(0xFFF5F6FA);
   static const Color bgCardLightMode = Color(0xFFFFFFFF);
   static const Color bgCardLightAccent = Color(0xFFEEF0F8);
   static const Color surfaceLight = Color(0xFFE8EAF2);
 
-  // ═══════════════════════════════════════════════
-  // ACCENT COLORS (shared)
-  // ═══════════════════════════════════════════════
+  // ── ACCENT COLORS (shared) ──
   static const Color accentCyan = Color(0xFF00E5FF);
   static const Color accentGreen = Color(0xFF00E676);
   static const Color accentPurple = Color(0xFF7C4DFF);
   static const Color accentAmber = Color(0xFFFFAB00);
   static const Color accentRed = Color(0xFFFF1744);
 
-  // ═══════════════════════════════════════════════
-  // TEXT COLORS — DARK
-  // ═══════════════════════════════════════════════
+  // ── TEXT COLORS — DARK ──
   static const Color textPrimary = Color(0xFFE8EAF6);
   static const Color textSecondary = Color(0xFF9FA8DA);
   static const Color textMuted = Color(0xFF5C6BC0);
 
-  // ═══════════════════════════════════════════════
-  // TEXT COLORS — LIGHT
-  // ═══════════════════════════════════════════════
+  // ── TEXT COLORS — LIGHT ──
   static const Color textPrimaryLight = Color(0xFF1A1D2E);
   static const Color textSecondaryLight = Color(0xFF4A5068);
   static const Color textMutedLight = Color(0xFF8890AA);
 
-  // ═══════════════════════════════════════════════
-  // THREAT LEVEL COLORS
-  // ═══════════════════════════════════════════════
+  // ── THREAT LEVEL COLORS ──
   static const Color cleanColor = Color(0xFF00E676);
   static const Color lowColor = Color(0xFF69F0AE);
   static const Color mediumColor = Color(0xFFFFAB00);
@@ -73,9 +61,7 @@ class AppTheme {
     }
   }
 
-  // ═══════════════════════════════════════════════
-  // GRADIENTS
-  // ═══════════════════════════════════════════════
+  // ── GRADIENTS ──
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [accentCyan, accentPurple],
     begin: Alignment.topLeft,
@@ -88,9 +74,7 @@ class AppTheme {
     end: Alignment.bottomRight,
   );
 
-  // ═══════════════════════════════════════════════
-  // THEME-AWARE HELPERS
-  // ═══════════════════════════════════════════════
+  // ── THEME-AWARE HELPERS ──
 
   /// Convenience to check if current theme is dark.
   static bool isDark(BuildContext context) =>
@@ -128,9 +112,7 @@ class AppTheme {
   static Color dividerColor(BuildContext context) =>
       isDark(context) ? Colors.white10 : Colors.black12;
 
-  // ═══════════════════════════════════════════════
-  // CARD DECORATIONS
-  // ═══════════════════════════════════════════════
+  // ── CARD DECORATIONS ──
 
   static BoxDecoration cardDecoration({Color? borderColor}) => BoxDecoration(
         color: bgCard,
@@ -197,9 +179,7 @@ class AppTheme {
     );
   }
 
-  // ═══════════════════════════════════════════════
-  // THEME DATA
-  // ═══════════════════════════════════════════════
+  // ── THEME DATA ──
 
   static ThemeData get darkTheme => ThemeData(
         brightness: Brightness.dark,

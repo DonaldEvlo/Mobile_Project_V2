@@ -40,7 +40,6 @@ class _SplashScreenState extends State<SplashScreen>
       curve: Curves.elasticOut,
     );
 
-    // Text fade-in animation
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -65,7 +64,6 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    // Glow pulse
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -114,7 +112,6 @@ class _SplashScreenState extends State<SplashScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Shield icon with glow
             AnimatedBuilder(
               animation: Listenable.merge([_scaleController, _glowController]),
               builder: (context, child) {
@@ -166,7 +163,6 @@ class _SplashScreenState extends State<SplashScreen>
             ),
             const SizedBox(height: 40),
 
-            // App name
             FadeTransition(
               opacity: _fadeAnim,
               child: ShaderMask(
@@ -185,7 +181,6 @@ class _SplashScreenState extends State<SplashScreen>
             ),
             const SizedBox(height: 12),
 
-            // Subtitle
             SlideTransition(
               position: _subtitleSlideAnim,
               child: FadeTransition(
@@ -203,7 +198,6 @@ class _SplashScreenState extends State<SplashScreen>
             ),
             const SizedBox(height: 60),
 
-            // Loading dots
             FadeTransition(
               opacity: _fadeAnim,
               child: SizedBox(

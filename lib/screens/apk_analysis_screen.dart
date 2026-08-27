@@ -104,7 +104,6 @@ class _ApkAnalysisScreenState extends State<ApkAnalysisScreen>
       _isLoading = false;
     });
 
-    // Animate the score
     final score = _securityManager.lastAnomalyScore;
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) _animateScoreTo(score);
@@ -310,7 +309,6 @@ class _ApkAnalysisScreenState extends State<ApkAnalysisScreen>
           ),
           child: Column(
             children: [
-              // Classification badge
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -349,7 +347,6 @@ class _ApkAnalysisScreenState extends State<ApkAnalysisScreen>
               ),
               const SizedBox(height: 16),
 
-              // Animated circular score
               SizedBox(
                 width: 80,
                 height: 80,
@@ -379,7 +376,6 @@ class _ApkAnalysisScreenState extends State<ApkAnalysisScreen>
               ),
               const SizedBox(height: 12),
 
-              // Score bar
               Row(
                 children: [
                   Text(
@@ -474,7 +470,6 @@ class _ApkAnalysisScreenState extends State<ApkAnalysisScreen>
           ),
           const SizedBox(height: 16),
 
-          // Summary chips
           Row(
             children: [
               _buildChip(

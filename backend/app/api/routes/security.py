@@ -218,19 +218,15 @@ async def receive_security_report(
     # Update device record
     await _update_device(db, payload, threat_level)
 
-    # ── Step 5: Background tasks ──
-    # ── Step 5: Background tasks OR Immediate LLM ──
+    # ── Step 5: LLM enrichment (inline when requested, otherwise background) ──
     llm_result_text = None
-    
+
     if threat_level in ("medium", "high", "critical"):
         if wait_for_llm:
-            # Run immediately and return result
             try:
                 analysis = await ollama_analyzer.analyze_incident(payload.model_dump(), threat_level)
                 if analysis:
                     llm_result_text = analysis.get("explanation", "")
-                    
-                    # Update report in DB
                     report.llm_analysis = llm_result_text
                     report.llm_false_positive_probability = analysis.get("false_positive_probability")
                     report.analyzed_at = datetime.now(timezone.utc)
@@ -239,7 +235,6 @@ async def receive_security_report(
             except Exception as e:
                 print(f"Immediate LLM enrichment failed: {e}")
         else:
-            # Run in background
             background_tasks.add_task(
                 _enrich_with_llm,
                 report.id,
@@ -280,7 +275,6 @@ async def _update_device(db: AsyncSession, payload: SecurityReportPayload, threa
         device.total_reports += 1
         if threat_level not in ("clean", "low"):
             device.total_threats += 1
-        # Update highest threat level
         level_order = {"clean": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
         if level_order.get(threat_level, 0) > level_order.get(device.highest_threat_level, 0):
             device.highest_threat_level = threat_level
@@ -302,22 +296,18 @@ async def analyze_apk(
     payload: ApkAuditPayload,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Analyze specific APK details using LLM and static rules.
-    """
-    # 1. Base Score Calculation
+    """Analyze APK details with static rules, then enrich with LLM commentary."""
     score = 0.0
-    
+
     if not payload.is_valid:
-        score += 0.8  # Invalid APK is very suspicious
-    
+        score += 0.8  # Unparseable APK
+
     if payload.is_debuggable:
-        score += 0.9  # Debuggable in prod is critical risk
-        
+        score += 0.9  # Debuggable build in production
+
     if payload.is_sideloaded:
-        score += 0.4  # Sideloading is risky but common
-        
-    # Permission risk
+        score += 0.4  # Risky but common
+
     if payload.sensitive_permissions_count > 5:
         score += 0.3
     if payload.sensitive_permissions_count > 10:
@@ -326,10 +316,8 @@ async def analyze_apk(
     score = min(score, 1.0)
     threat_level = _score_to_level(score)
 
-    # 2. LLM Analysis
     llm_explanation = None
     try:
-        # Construct a prompt context for the LLM
         context = {
             "task": "APK_ANALYSIS",
             "instruction": (
@@ -353,10 +341,8 @@ async def analyze_apk(
             "receivers": payload.receivers,
             "providers": payload.providers,
         }
-        
-        # We reuse the analyzer but with a custom prompt focus
+
         llm_result = await ollama_analyzer.analyze_incident(context, threat_level)
-        print(f"[DEBUG] Analyze APK LLM Result: {llm_result is not None}")
         if llm_result:
             llm_explanation = llm_result.get("explanation")
     except Exception as e:
@@ -380,9 +366,9 @@ async def analyze_apk(
 # ── Per-Item AI Risk Explanation ──
 
 class ExplainRiskPayload(BaseModel):
-    item_type: str  # 'permission', 'activity', 'service', 'receiver', 'provider'
+    item_type: str  # permission | activity | service | receiver | provider
     item_name: str
-    context: dict = {}  # package_name, all_permissions, activities, services, etc.
+    context: dict = {}
 
 
 class ExplainRiskResponse(BaseModel):

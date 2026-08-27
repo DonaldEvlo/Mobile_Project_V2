@@ -148,7 +148,6 @@ class _SecurityGateState extends State<SecurityGate>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Animated shield
         FadeInDown(
           child: AnimatedBuilder(
             animation: _pulseController,
@@ -193,7 +192,6 @@ class _SecurityGateState extends State<SecurityGate>
         ),
         const SizedBox(height: 40),
 
-        // Title
         FadeIn(
           delay: const Duration(milliseconds: 300),
           child: Text(
@@ -208,7 +206,6 @@ class _SecurityGateState extends State<SecurityGate>
         ),
         const SizedBox(height: 12),
 
-        // Status text
         Text(
           _statusText,
           style: GoogleFonts.jetBrainsMono(
@@ -219,7 +216,6 @@ class _SecurityGateState extends State<SecurityGate>
         ),
         const SizedBox(height: 32),
 
-        // Progress bar
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
@@ -250,7 +246,6 @@ class _SecurityGateState extends State<SecurityGate>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Warning icon
           Container(
             width: 100,
             height: 100,
@@ -299,7 +294,6 @@ class _SecurityGateState extends State<SecurityGate>
 
           const SizedBox(height: 32),
 
-          // Continue button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -335,7 +329,6 @@ class _SecurityGateState extends State<SecurityGate>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Blocked icon
           AnimatedBuilder(
             animation: _pulseController,
             builder: (context, child) {
@@ -408,7 +401,6 @@ class _SecurityGateState extends State<SecurityGate>
 
           const SizedBox(height: 32),
 
-          // Blocked message
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(

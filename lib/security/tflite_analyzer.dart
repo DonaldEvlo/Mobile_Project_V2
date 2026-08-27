@@ -5,30 +5,25 @@ import 'package:logger/logger.dart';
 import 'models/behavior_event.dart';
 import 'models/security_report.dart';
 
-/// On-device anomaly detector using TFLite.
+/// On-device anomaly detector.
 ///
-/// Extracts 6-dimension behavioral features from the event buffer
-/// and runs inference locally (offline-first design).
+/// Extracts 6-dimension behavioral features from the event buffer and scores
+/// them locally, so detection keeps working without a backend.
 ///
-/// NOTE: In the initial version, TFLite model loading is stubbed.
-/// The actual .tflite model will be generated from the backend
-/// Isolation Forest after training on real behavioral data.
+/// The TFLite model is not shipped yet: scoring falls back to the calibrated
+/// heuristics in [_heuristicScore], which mirror the attack signatures used by
+/// the backend Isolation Forest.
 class TFLiteAnalyzer {
   final _log = Logger(printer: PrettyPrinter(methodCount: 0));
   bool _isInitialized = false;
 
-  // TFLite interpreter — uncomment when model is ready:
-  // late Interpreter _interpreter;
-
-  /// Initialize the TFLite model from assets.
+  /// Initialize the analyzer. Loads the TFLite model once it is available.
   Future<void> initialize() async {
     try {
-      // When the real model is ready, load it:
-      // _interpreter = await Interpreter.fromAsset('models/anomaly_detector.tflite');
       _isInitialized = true;
-      _log.i('TFLite analyzer initialized (using heuristic fallback)');
+      _log.i('Anomaly analyzer initialized (heuristic scoring)');
     } catch (e) {
-      _log.e('Failed to initialize TFLite model: $e');
+      _log.e('Failed to initialize anomaly analyzer: $e');
       _isInitialized = false;
     }
   }
@@ -37,42 +32,29 @@ class TFLiteAnalyzer {
   ///
   /// Returns a score between 0.0 (normal) and 1.0 (highly anomalous).
   Future<double> analyzeBuffer(List<BehaviorEvent> events) async {
-    if (events.isEmpty) return 0.0;
+    if (events.isEmpty || !_isInitialized) return 0.0;
 
-    final features = extractFeatures(events);
-
-    if (_isInitialized) {
-      return _runInference(features);
-    } else {
-      // Heuristic fallback when model isn't loaded
-      return _heuristicScore(features);
-    }
+    return _heuristicScore(extractFeatures(events));
   }
 
-  /// Extract 6-dimension feature vector from event buffer.
+  /// Extract the 6-dimension feature vector from the event buffer.
   BehaviorFeatures extractFeatures(List<BehaviorEvent> events) {
-    // 1. Network calls count
     final networkCalls = events
         .where((e) => e.type == BehaviorEventType.networkCall)
         .length
         .toDouble();
 
-    // 2. File access count
     final fileAccesses = events
         .where((e) => e.type == BehaviorEventType.fileAccess)
         .length
         .toDouble();
 
-    // 3. Timing entropy — Shannon entropy of inter-event intervals
     final timingEntropy = _calculateTimingEntropy(events);
 
-    // 4. API call sequence hash — normalized hash of API call order
     final apiSequenceHash = _calculateApiSequenceHash(events);
 
-    // 5. Memory anomaly score — from native metadata if available
     final memoryScore = _extractMemoryAnomalyScore(events);
 
-    // 6. CPU spike count
     final cpuSpikes = events
         .where((e) => e.type == BehaviorEventType.cpuSpike)
         .length
@@ -88,27 +70,7 @@ class TFLiteAnalyzer {
     );
   }
 
-  /// Run TFLite inference on the 6-dimension feature vector.
-  Future<double> _runInference(BehaviorFeatures features) async {
-    try {
-      final input = features.toFeatureVector();
-
-      // When the real model is ready:
-      // final output = List.filled(1, 0.0).reshape([1, 1]);
-      // _interpreter.run(input.reshape([1, input.length]), output);
-      // return (output[0][0] as double).clamp(0.0, 1.0);
-
-      // Fallback to heuristic for now
-      return _heuristicScore(features);
-    } catch (e) {
-      _log.e('TFLite inference failed: $e');
-      return _heuristicScore(features);
-    }
-  }
-
-  /// Heuristic anomaly scoring when TFLite isn't available.
-  ///
-  /// Uses calibrated thresholds based on the spec's attack signatures.
+  /// Heuristic anomaly scoring, calibrated on the known attack signatures.
   double _heuristicScore(BehaviorFeatures f) {
     double score = 0.0;
 
@@ -164,7 +126,6 @@ class TFLiteAnalyzer {
       buckets[bucket]++;
     }
 
-    // Shannon entropy
     final total = intervals.length.toDouble();
     double entropy = 0.0;
     for (final count in buckets) {
@@ -187,7 +148,6 @@ class TFLiteAnalyzer {
 
     if (apiCalls.isEmpty) return 0.0;
 
-    // Simple hash normalized to 0-1
     int hash = 0;
     for (final call in apiCalls) {
       hash = (hash * 31 + call.hashCode) & 0x7FFFFFFF;
@@ -202,7 +162,6 @@ class TFLiteAnalyzer {
 
     if (memoryEvents.isEmpty) return 0.0;
 
-    // Average memory anomaly scores
     double total = 0.0;
     for (final event in memoryEvents) {
       total += (event.metadata['score'] as num?)?.toDouble() ?? 0.0;
@@ -211,7 +170,6 @@ class TFLiteAnalyzer {
   }
 
   void dispose() {
-    // _interpreter.close();
     _isInitialized = false;
   }
 }

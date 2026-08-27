@@ -12,9 +12,8 @@ import 'tflite_analyzer.dart';
 
 /// Singleton orchestrator for the entire mobile security detection system.
 ///
-/// Coordinates native checks, TFLite inference, event buffering,
-/// and backend reporting. Implements the offline-first detection pipeline
-/// as described in the architecture spec.
+/// Coordinates native checks, on-device behavioral scoring, event buffering,
+/// and backend reporting, following an offline-first pipeline.
 class SecurityManager {
   // ── Singleton ──
   static final SecurityManager _instance = SecurityManager._internal();
@@ -60,13 +59,8 @@ class SecurityManager {
 
     _log.i('Initializing SecurityManager...');
 
-    // 1. Initialize TFLite model
     await _tfliteAnalyzer.initialize();
-
-    // 2. Initialize secure HTTP client for backend reporting
     await _securityService.initialize();
-
-    // 3. Run initial security checks immediately
     await runFullSecurityScan();
 
     _isInitialized = true;
@@ -78,9 +72,10 @@ class SecurityManager {
   /// Run the complete security scan pipeline.
   ///
   /// 1. Native checks (Frida, root, signature, DEX, etc.)
-  /// 2. TFLite behavioral analysis
-  /// 3. Combined threat level assessment
-  /// 4. Backend reporting (if connected)
+  /// 2. APK integrity audit
+  /// 3. On-device behavioral scoring
+  /// 4. Combined threat level assessment
+  /// 5. Backend reporting (when reachable)
   Future<ThreatLevel> runFullSecurityScan() async {
     _log.d('Running full security scan...');
 
@@ -93,7 +88,7 @@ class SecurityManager {
     final apkAudit = _analyzeApk(apkInfo);
     _lastApkAudit = apkAudit;
 
-    // Step 3: TFLite behavioral analysis
+    // Step 3: Behavioral scoring
     final features = _tfliteAnalyzer.extractFeatures(_eventBuffer);
     _lastAnomalyScore = await _tfliteAnalyzer.analyzeBuffer(_eventBuffer);
 
@@ -102,7 +97,6 @@ class SecurityManager {
     final combinedScore = (staticScore * 0.6) + (_lastAnomalyScore * 0.4);
     final threatLevel = ThreatLevel.fromScore(combinedScore);
 
-    // Step 5: Update state and notify
     if (threatLevel != _currentThreatLevel) {
       _currentThreatLevel = threatLevel;
       onThreatLevelChanged?.call(threatLevel);
@@ -111,10 +105,9 @@ class SecurityManager {
       );
     }
 
-    // Update anomaly score immediately for UI
+    // Fire again unconditionally so the UI refreshes its anomaly score.
     onThreatLevelChanged?.call(threatLevel);
 
-    // Step 6: Report to backend
     try {
       final report = SecurityReport(
         deviceId: await _securityService.getDeviceId(),
@@ -131,14 +124,14 @@ class SecurityManager {
         onForceLogout?.call(response);
       }
     } catch (e) {
+      // Offline-first: local detection continues without the backend.
       _log.w('Backend report failed (offline mode): $e');
-      // Offline-first: local detection continues without backend
     }
 
     return threatLevel;
   }
 
-  /// Delegate external APK analysis to the securty service.
+  /// Delegate external APK analysis to the security service.
   Future<SecurityReportResponse?> sendExternalApkAnalysis(
       ApkAudit audit) async {
     return _securityService.sendExternalApkAnalysis(audit);
@@ -179,7 +172,7 @@ class SecurityManager {
   void recordEvent(BehaviorEvent event) {
     _eventBuffer.add(event);
 
-    // Sliding window: keep the last N events
+    // Sliding window: keep the last _maxBufferSize events
     while (_eventBuffer.length > _maxBufferSize) {
       _eventBuffer.removeAt(0);
     }
@@ -238,20 +231,18 @@ class SecurityManager {
   double _calculateStaticScore(SecurityChecks checks, ApkAudit audit) {
     double maxScore = 0.0;
 
-    // --- APK Integrity ---
+    // APK integrity
     if (!audit.isValid) {
-      maxScore = 0.85; // Failed to parse APK info
+      maxScore = 0.85;
     }
     if (audit.isSideloaded) {
-      // Sideloading is common but risky
       maxScore = maxScore > 0.45 ? maxScore : 0.45;
     }
     if (audit.isDebuggable) {
-      // Debuggable logic in prod is VERY dangerous
       maxScore = maxScore > 0.90 ? maxScore : 0.90;
     }
 
-    // --- Native Checks ---
+    // Native checks
     if (checks.fridaDetected) {
       maxScore = maxScore > 0.95 ? maxScore : 0.95;
     }

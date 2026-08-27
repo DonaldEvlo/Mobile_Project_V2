@@ -36,7 +36,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   Timer? _graphDataTimer;
   bool _isScanning = false;
 
-  // Live Graph Data
   final List<double> _scoreHistory = List.filled(50, 0.0);
 
   @override
@@ -197,7 +196,6 @@ class _DashboardScreenState extends State<DashboardScreen>
               ],
             ),
             actions: [
-              // APK analysis button
               IconButton(
                 icon: const Icon(Icons.find_in_page,
                     color: AppTheme.textSecondary, size: 20),
@@ -211,7 +209,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 36),
               ),
-              // External APK Scan
               IconButton(
                 icon: const Icon(Icons.upload_file,
                     color: AppTheme.accentAmber, size: 20),
@@ -220,7 +217,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 36),
               ),
-              // Theme toggle
               IconButton(
                 icon: Icon(
                   AppTheme.isDark(context) ? Icons.light_mode : Icons.dark_mode,
@@ -232,7 +228,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 36),
               ),
-              // Manual scan button
               RotationTransition(
                 turns: _scanController,
                 child: IconButton(
@@ -314,7 +309,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         return Stack(
           alignment: Alignment.center,
           children: [
-            // Container with glow
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -338,7 +332,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Base Circle
                         Container(
                           width: 80,
                           height: 80,
@@ -386,7 +379,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                   const SizedBox(height: 16),
 
-                  // Threat level text
                   Text(
                     threat.label.toUpperCase(),
                     style: GoogleFonts.inter(
@@ -398,7 +390,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                   const SizedBox(height: 8),
 
-                  // Score
                   Text(
                     'Combined Score: ${score.toStringAsFixed(3)}',
                     style: GoogleFonts.jetBrainsMono(
@@ -408,7 +399,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                   const SizedBox(height: 12),
 
-                  // Score bar
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
@@ -447,7 +437,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             color: AppTheme.textPrimary,
           ),
         ),
-        // Pulsing dot
         const Spacer(),
         FadeTransition(
           opacity: _radarController,
@@ -739,7 +728,6 @@ class _QwenAnalysisDialog extends StatefulWidget {
 
 class _QwenAnalysisDialogState extends State<_QwenAnalysisDialog>
     with SingleTickerProviderStateMixin {
-  // Phases
   String _phase = 'checking'; // checking, analyzing, complete, error
   String _modelName = 'qwen2.5:1.5b';
   String _statusMessage = 'Vérification de la connexion Ollama…';
@@ -791,7 +779,6 @@ class _QwenAnalysisDialogState extends State<_QwenAnalysisDialog>
           'Cela peut prendre jusqu\'à 2 minutes.';
     });
 
-    // Start elapsed time counter
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _elapsedSeconds++);
     });
@@ -847,7 +834,6 @@ class _QwenAnalysisDialogState extends State<_QwenAnalysisDialog>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
             Row(
               children: [
                 Container(
@@ -895,11 +881,9 @@ class _QwenAnalysisDialogState extends State<_QwenAnalysisDialog>
             ),
             const SizedBox(height: 20),
 
-            // Status indicator
             _buildStatusIndicator(),
             const SizedBox(height: 16),
 
-            // Model info chip
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
@@ -932,7 +916,6 @@ class _QwenAnalysisDialogState extends State<_QwenAnalysisDialog>
             ),
             const SizedBox(height: 16),
 
-            // Status message
             Text(
               _statusMessage,
               textAlign: TextAlign.center,
@@ -943,7 +926,6 @@ class _QwenAnalysisDialogState extends State<_QwenAnalysisDialog>
               ),
             ),
 
-            // Elapsed time (during analysis)
             if (_phase == 'analyzing') ...[
               const SizedBox(height: 8),
               Text(
@@ -957,7 +939,6 @@ class _QwenAnalysisDialogState extends State<_QwenAnalysisDialog>
 
             const SizedBox(height: 20),
 
-            // Action buttons
             if (_phase == 'error')
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -1117,7 +1098,6 @@ class GraphPainter extends CustomPainter {
     final path = Path();
     final dx = size.width / (data.length - 1);
 
-    // Move to first point
     double startY = size.height - (data[0] / maxVal * size.height);
     path.moveTo(0, startY);
 
@@ -1139,7 +1119,6 @@ class GraphPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Gradient fill below
     final fillPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,

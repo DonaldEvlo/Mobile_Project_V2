@@ -24,22 +24,16 @@ class FeatureExtractor:
         if not events:
             return [0.0, 0.0, 0.5, 0.0, 0.0, 0.0]
 
-        # 1. Network calls count
         network_count = sum(1 for e in events if e.get("type") == "networkCall")
 
-        # 2. File access count
         file_count = sum(1 for e in events if e.get("type") == "fileAccess")
 
-        # 3. Timing entropy
         timing_entropy = FeatureExtractor._compute_timing_entropy(events)
 
-        # 4. API call sequence hash (normalized)
         api_hash = FeatureExtractor._compute_api_sequence_hash(events)
 
-        # 5. Memory anomaly score
         memory_score = FeatureExtractor._compute_memory_score(events)
 
-        # 6. CPU spike count
         cpu_spikes = sum(1 for e in events if e.get("type") == "cpuSpike")
 
         return [
@@ -79,13 +73,12 @@ class FeatureExtractor:
         if max_interval == 0:
             return 0.0  # All simultaneous — suspicious
 
-        # Bucket into 10 bins
+        # Bucket intervals into 10 bins
         buckets = [0] * 10
         for interval in intervals:
             bucket = min(9, int((interval / max_interval) * 9))
             buckets[bucket] += 1
 
-        # Shannon entropy (normalized)
         total = len(intervals)
         entropy = 0.0
         for count in buckets:

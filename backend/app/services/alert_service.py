@@ -22,11 +22,9 @@ class AlertService:
         """Send critical threat alert to all configured channels."""
         message = self._build_alert_message(device_id, score, attack_type)
 
-        # Send to Slack
         if settings.SLACK_WEBHOOK_URL:
             await self._send_slack(message)
 
-        # Send to SIEM
         if settings.SIEM_WEBHOOK_URL:
             await self._send_siem(device_id, score, attack_type)
 

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:logger/logger.dart';
 
@@ -47,17 +45,14 @@ class ExternalApkScanner {
       _log.d('Analyse APK externe : $path');
       final info = await _apkCollector.getExternalApkInfo(path);
 
-      return _analyzeExternalApk(info, path);
+      return _analyzeExternalApk(info);
     } catch (e) {
       _log.e('Échec de l\'analyse APK externe : $e');
       return null;
     }
   }
 
-  ApkAudit _analyzeExternalApk(ApkInfo info, String path) {
-    final file = File(path);
-    final size = file.existsSync() ? file.lengthSync() : 0;
-
+  ApkAudit _analyzeExternalApk(ApkInfo info) {
     return ApkAudit(
       packageName: info.packageName,
       version: '${info.versionName} (${info.versionCode})',

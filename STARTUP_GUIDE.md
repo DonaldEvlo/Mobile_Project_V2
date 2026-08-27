@@ -60,7 +60,7 @@ docker ps
 curl http://localhost:8000/api/security/health
 ```
 
-La réponse doit contenir `"llm_status": "available"` et `"llm_model": "qwen2.5:1.5b"`.
+La réponse doit contenir `"llm_status": "connected"` et `"llm_model": "qwen2.5:1.5b"`.
 
 ### 1.4 Voir les logs
 

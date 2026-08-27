@@ -59,11 +59,9 @@ async def get_dashboard_stats(
     user: dict = Depends(get_current_user),
 ):
     """Get aggregate statistics for the security dashboard."""
-    # Total reports
     total_result = await db.execute(select(func.count(SecurityReportModel.id)))
     total_reports = total_result.scalar() or 0
 
-    # Threats by level
     level_counts = {}
     for level in ThreatLevelEnum:
         count_result = await db.execute(
@@ -72,13 +70,11 @@ async def get_dashboard_stats(
         )
         level_counts[level.value] = count_result.scalar() or 0
 
-    # Average score
     avg_result = await db.execute(
         select(func.avg(SecurityReportModel.combined_score))
     )
     avg_score = avg_result.scalar() or 0.0
 
-    # Critical incidents in last 24 hours
     from datetime import timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     critical_result = await db.execute(
@@ -107,10 +103,7 @@ async def websocket_incidents(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            # Wait for incoming messages (keep-alive or filter requests)
             data = await websocket.receive_text()
-
-            # Echo back as acknowledgement
             await websocket.send_json({
                 "type": "ack",
                 "message": f"Received: {data}",

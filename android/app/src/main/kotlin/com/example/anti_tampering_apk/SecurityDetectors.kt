@@ -20,9 +20,7 @@ import java.security.MessageDigest
  */
 class SecurityDetectors(private val context: Context) {
 
-    // ═══════════════════════════════════════════════════════════════
-    // TODO: Replace these with your actual values before release
-    // ═══════════════════════════════════════════════════════════════
+    // ── TODO: Replace these with your actual values before release ──
     companion object {
         // SHA-256 of your release signing certificate
         const val EXPECTED_CERT_FINGERPRINT = "REPLACE_WITH_YOUR_CERT_SHA256"
@@ -30,9 +28,7 @@ class SecurityDetectors(private val context: Context) {
         const val EXPECTED_DEX_HASH = "REPLACE_WITH_YOUR_DEX_SHA256"
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 1. FRIDA DETECTION — Weight: CRITIQUE (0.95)
-    // ─────────────────────────────────────────────────────────────
+    // ── 1. FRIDA DETECTION — Weight: CRITIQUE (0.95) ──
     /**
      * Detects Frida instrumentation toolkit by:
      * - Scanning default Frida ports (27042-27043)
@@ -98,9 +94,7 @@ class SecurityDetectors(private val context: Context) {
         return false
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 2. HOOK DETECTION — Weight: CRITIQUE (0.90)
-    // ─────────────────────────────────────────────────────────────
+    // ── 2. HOOK DETECTION — Weight: CRITIQUE (0.90) ──
     /**
      * Detects runtime hooking by verifying that critical method
      * modifiers haven't been altered (e.g., by Frida or Substrate).
@@ -135,9 +129,7 @@ class SecurityDetectors(private val context: Context) {
         return false
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 3. CERT PINNING BYPASS DETECTION — Weight: ÉLEVÉ (0.85)
-    // ─────────────────────────────────────────────────────────────
+    // ── 3. CERT PINNING BYPASS DETECTION — Weight: ÉLEVÉ (0.85) ──
     /**
      * Detects if a TLS interceptor (Burp Suite, mitmproxy, etc.)
      * has been installed as a trusted CA certificate.
@@ -172,9 +164,7 @@ class SecurityDetectors(private val context: Context) {
         return false
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 4. APK SIGNATURE VERIFICATION — Weight: ÉLEVÉ (0.80)
-    // ─────────────────────────────────────────────────────────────
+    // ── 4. APK SIGNATURE VERIFICATION — Weight: ÉLEVÉ (0.80) ──
     /**
      * Verifies the APK signing certificate's SHA-256 fingerprint
      * against the hardcoded expected value.
@@ -219,9 +209,7 @@ class SecurityDetectors(private val context: Context) {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 5. DEX INTEGRITY — Weight: ÉLEVÉ (0.80)
-    // ─────────────────────────────────────────────────────────────
+    // ── 5. DEX INTEGRITY — Weight: ÉLEVÉ (0.80) ──
     /**
      * Computes SHA-256 of classes.dex and compares with
      * the expected hash. Detects repackaged APKs.
@@ -256,9 +244,7 @@ class SecurityDetectors(private val context: Context) {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 6. XPOSED DETECTION — Weight: MOYEN (0.70)
-    // ─────────────────────────────────────────────────────────────
+    // ── 6. XPOSED DETECTION — Weight: MOYEN (0.70) ──
     /**
      * Detects the Xposed Framework by searching for its
      * classes in the classloader.
@@ -307,9 +293,7 @@ class SecurityDetectors(private val context: Context) {
         return false
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 7. DEBUGGER DETECTION — Weight: MOYEN (0.60)
-    // ─────────────────────────────────────────────────────────────
+    // ── 7. DEBUGGER DETECTION — Weight: MOYEN (0.60) ──
     /**
      * Detects attached debuggers via:
      * - Debug.isDebuggerConnected() API
@@ -355,9 +339,7 @@ class SecurityDetectors(private val context: Context) {
         return false
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 8. ROOT DETECTION — Weight: FAIBLE (0.40)
-    // ─────────────────────────────────────────────────────────────
+    // ── 8. ROOT DETECTION — Weight: FAIBLE (0.40) ──
     /**
      * Detects rooted devices by checking for su binaries,
      * root management apps, and dangerous system properties.
@@ -413,9 +395,7 @@ class SecurityDetectors(private val context: Context) {
         return false
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 9. EMULATOR DETECTION — Weight: INFO (0.20)
-    // ─────────────────────────────────────────────────────────────
+    // ── 9. EMULATOR DETECTION — Weight: INFO (0.20) ──
     /**
      * Detects emulator environments via Build properties,
      * QEMU indicators, and hardware characteristics.
@@ -472,9 +452,7 @@ class SecurityDetectors(private val context: Context) {
         return false
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // UTILITIES
-    // ─────────────────────────────────────────────────────────────
+    // ── UTILITIES ──
 
     /**
      * Get environment metadata for the security report.

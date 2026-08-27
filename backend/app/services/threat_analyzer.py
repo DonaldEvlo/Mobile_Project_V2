@@ -47,12 +47,7 @@ class ThreatAnalyzer:
             if value is None:
                 continue
 
-            # Determine if this check indicates a threat
-            is_threat = False
-            if check_name in self.INVERTED_CHECKS:
-                is_threat = not value  # False = invalid = threat
-            else:
-                is_threat = bool(value)  # True = detected = threat
+            is_threat = not value if check_name in self.INVERTED_CHECKS else bool(value)
 
             if is_threat:
                 triggered.append({
@@ -62,7 +57,6 @@ class ThreatAnalyzer:
                 })
                 max_score = max(max_score, weight)
 
-        # Build attack indicators from triggered checks
         attack_indicators = self._infer_attack_type(triggered)
 
         return {

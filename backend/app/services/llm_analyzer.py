@@ -71,7 +71,6 @@ class OllamaAnalyzer:
     ) -> Optional[Dict[str, Any]]:
         """Generate a focused risk explanation for a single APK component."""
         prompt = self._build_item_explanation_prompt(item_type, item_name, context)
-        # Use shorter max_tokens for per-item explanations (faster)
         response = await self._query_ollama(prompt, max_tokens=512)
 
         if response is None:
@@ -84,7 +83,6 @@ class OllamaAnalyzer:
     async def _query_ollama(self, prompt: str, max_tokens: int = 2048) -> Optional[str]:
         """Send a prompt to Ollama and return the response text."""
         try:
-            print(f"[LLM] DEBUG: Using model '{settings.OLLAMA_MODEL}' at '{settings.OLLAMA_URL}' (max_tokens={max_tokens})")
             timeout = httpx.Timeout(
                 connect=10.0,
                 read=float(settings.OLLAMA_TIMEOUT),
@@ -155,7 +153,6 @@ class OllamaAnalyzer:
         receivers = report.get('receivers', [])
         providers = report.get('providers', [])
 
-        # Build a concise data block
         data_block = f"""Package: {pkg} v{ver}
 Debuggable: {debug} | Sideloaded: {side} | Menace: {threat_level}
 Permissions sensibles ({len(sensitive)}): {', '.join(sensitive[:15]) if sensitive else 'aucune'}
@@ -190,7 +187,6 @@ Réponds en JSON:
         checks = report.get("security_checks", {})
         features = report.get("behavior_features", {})
 
-        # Only include checks that triggered
         triggered = []
         check_map = {
             "frida_detected": "Frida détecté",
@@ -305,20 +301,18 @@ JSON:
 
     def _parse_json_response(self, response: str) -> Optional[Dict]:
         """Extract JSON from LLM response, handling various output formats."""
-        print(f"[LLM] RAW RESPONSE (first 500chars): {response[:500]}")
         try:
             result = json.loads(response)
-            # Validate that explanation field is not just template text
             if isinstance(result, dict):
                 explanation = result.get("explanation", "")
                 if explanation and self._is_template_text(explanation):
-                    print("[LLM] WARNING: Response contains template text, not real analysis")
+                    print("[LLM] Response is template text, not a real analysis")
                     return None
             return result
         except json.JSONDecodeError:
             pass
 
-        # Try extracting JSON from within text
+        # Fall back to the outermost JSON object embedded in surrounding text
         try:
             start_index = response.find('{')
             end_index = response.rfind('}')
@@ -329,13 +323,13 @@ JSON:
                 if isinstance(result, dict):
                     explanation = result.get("explanation", "")
                     if explanation and self._is_template_text(explanation):
-                        print("[LLM] WARNING: Extracted JSON contains template text")
+                        print("[LLM] Extracted JSON is template text")
                         return None
                 return result
         except (json.JSONDecodeError, AttributeError):
             pass
 
-        print(f"[LLM] Failed to parse response as JSON")
+        print("[LLM] Failed to parse response as JSON")
         return None
 
     def _is_template_text(self, text: str) -> bool:

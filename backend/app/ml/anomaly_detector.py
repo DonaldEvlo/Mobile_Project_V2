@@ -79,7 +79,6 @@ class AnomalyDetector:
             n_jobs=-1,
         ).fit(X_scaled)
 
-        # Save model to disk
         os.makedirs(os.path.dirname(settings.ML_MODEL_PATH), exist_ok=True)
         joblib.dump(self.model, settings.ML_MODEL_PATH)
         joblib.dump(self.scaler, settings.ML_SCALER_PATH)
@@ -110,10 +109,7 @@ class AnomalyDetector:
             # Normalize to 0-1 (1 = very anomalous)
             anomaly_score = float(max(0.0, min(1.0, 0.5 - raw_score)))
 
-            # Classify attack type
-            attack_type = self._classify_attack(features, anomaly_score)
-
-            return anomaly_score, attack_type
+            return anomaly_score, self._classify_attack(features, anomaly_score)
 
         except Exception as e:
             print(f"[ML] Prediction error: {e}")
@@ -134,23 +130,18 @@ class AnomalyDetector:
 
         network, files, entropy, api_hash, memory, cpu = features
 
-        # Frida injection
         if memory > 0.8 and network > 50:
             return "frida_injection"
 
-        # APK repackaging
         if entropy < 0.1 and network > 5:
             return "apk_repack"
 
-        # MITM attempt
         if network > 100 and cpu > 10:
             return "mitm_attempt"
 
-        # Root exploit
         if files > 30 and memory > 0.6:
             return "root_exploit"
 
-        # Unknown anomaly
         if anomaly_score > 0.6:
             return "unknown_anomaly"
 

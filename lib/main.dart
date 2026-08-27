@@ -7,14 +7,12 @@ import 'theme_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize theme provider (lightweight, safe)
   final themeProvider = ThemeProvider();
   await themeProvider.initialize();
 
-  // Security initialization happens in SecurityGate, NOT here.
-  // Running it before runApp() caused crashes when backend was unreachable
-  // or native plugins were missing (emulator).
-
+  // Security initialization runs in SecurityGate, not here: doing it before
+  // runApp() crashed when the backend was unreachable or native plugins were
+  // missing (emulator).
   runApp(AntiTamperingApp(themeProvider: themeProvider));
 }
 

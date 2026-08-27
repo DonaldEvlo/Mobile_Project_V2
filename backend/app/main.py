@@ -12,24 +12,20 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan — startup and shutdown events."""
-    # ── Startup ──
     print(f"[API] Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
-    # Initialize database tables
     print("[API] Initializing database...")
     await init_db()
 
-    # Pre-load ML model
     print("[API] Loading ML model...")
     from app.ml.anomaly_detector import AnomalyDetector
     _detector = AnomalyDetector()  # noqa: F841
     print("[API] ML model ready")
 
-    print(f"[API] Server ready on port 8000")
+    print("[API] Server ready on port 8000")
 
     yield
 
-    # ── Shutdown ──
     print("[API] Shutting down...")
 
 
@@ -74,7 +70,6 @@ async def api_health():
         "version": settings.APP_VERSION,
     }
 
-    # Check database
     try:
         from app.core.database import async_session
         async with async_session() as session:
@@ -83,7 +78,6 @@ async def api_health():
     except Exception:
         health["database"] = "unavailable"
 
-    # Check Ollama
     try:
         import httpx
         async with httpx.AsyncClient(timeout=5) as client:

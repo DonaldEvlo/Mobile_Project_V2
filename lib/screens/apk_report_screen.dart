@@ -301,7 +301,6 @@ class _ApkReportScreenState extends State<ApkReportScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // Score bar
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
@@ -580,7 +579,6 @@ class _ApkReportScreenState extends State<ApkReportScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Sensitive permissions first
           if (audit.sensitivePermissions.isNotEmpty) ...[
             Row(
               children: [
@@ -966,7 +964,6 @@ class _PermissionTileState extends State<_PermissionTile> {
                   ),
                 ),
               ),
-              // AI analyze button
               GestureDetector(
                 onTap: _fetchAiExplanation,
                 child: Container(
@@ -1001,7 +998,6 @@ class _PermissionTileState extends State<_PermissionTile> {
               ),
             ],
           ),
-          // Static risk
           if (widget.staticRisk != null)
             Padding(
               padding: const EdgeInsets.only(left: 12, top: 2),
@@ -1014,7 +1010,6 @@ class _PermissionTileState extends State<_PermissionTile> {
                 ),
               ),
             ),
-          // AI explanation
           if (_showAiExplain)
             Container(
               margin: const EdgeInsets.only(left: 12, top: 4, bottom: 4),
@@ -1288,7 +1283,6 @@ class _ComponentGroupExpanderState extends State<_ComponentGroupExpander> {
               ),
             );
           }),
-          // Expand / collapse remaining
           if (widget.items.length > initialCount && !_expanded)
             GestureDetector(
               onTap: () => setState(() => _expanded = true),
@@ -1443,7 +1437,6 @@ class _ComponentDetailSheetState extends State<_ComponentDetailSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle bar
             Center(
               child: Container(
                 width: 40,
@@ -1456,7 +1449,6 @@ class _ComponentDetailSheetState extends State<_ComponentDetailSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Component type badge
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -1475,7 +1467,6 @@ class _ComponentDetailSheetState extends State<_ComponentDetailSheet> {
             ),
             const SizedBox(height: 12),
 
-            // Short name
             Text(
               widget.shortName,
               style: GoogleFonts.inter(
@@ -1486,7 +1477,6 @@ class _ComponentDetailSheetState extends State<_ComponentDetailSheet> {
             ),
             const SizedBox(height: 4),
 
-            // Full qualified name
             Text(
               widget.fullName,
               style: GoogleFonts.jetBrainsMono(
@@ -1496,7 +1486,6 @@ class _ComponentDetailSheetState extends State<_ComponentDetailSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Static suspicion warning
             if (widget.suspicion != null)
               Container(
                 width: double.infinity,
@@ -1527,7 +1516,6 @@ class _ComponentDetailSheetState extends State<_ComponentDetailSheet> {
                 ),
               ),
 
-            // AI Analysis section
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
